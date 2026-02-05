@@ -1,0 +1,9 @@
+-- Temporarily disable RLS to allow custom JWT auth
+-- We handle auth at the API level with JWT middleware
+
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms DISABLE ROW LEVEL SECURITY;
+ALTER TABLE player_decks DISABLE ROW LEVEL SECURITY;
+ALTER TABLE challenges DISABLE ROW LEVEL SECURITY;
+ALTER TABLE game_events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_room_history DISABLE ROW LEVEL SECURITY;
