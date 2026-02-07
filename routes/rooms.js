@@ -193,12 +193,19 @@ router.get('/:roomId', authMiddleware, async (req, res) => {
 router.get('/:roomId/history', authMiddleware, async (req, res) => {
     try {
         const { roomId } = req.params;
+        console.log(`[API] Fetching history for room: ${roomId}`);
 
-        const { data: challenges } = await supabase
+        const { data: challenges, error: challengeError } = await supabase
             .from('challenges')
             .select('*')
             .eq('room_id', roomId)
             .order('sent_at', { ascending: false });
+
+        if (challengeError) {
+            console.error('[API] Challenge fetch error:', challengeError);
+        } else {
+            console.log(`[API] Found ${challenges ? challenges.length : 0} challenges`);
+        }
 
         const { data: events } = await supabase
             .from('game_events')
@@ -226,9 +233,9 @@ async function generateDeck(userId) {
     const defaultCards = require('../data/cards').data || [];
     const pool = cardPool && cardPool.length > 0 ? cardPool : defaultCards;
 
-    // Shuffle and pick 25 random
-    const shuffled = [...pool].sort(() => 0.5 - Math.random());
-    const randomCards = shuffled.slice(0, 25);
+    // Shuffle and include ALL cards
+    const randomCards = [...pool].sort(() => 0.5 - Math.random());
+    // const randomCards = shuffled.slice(0, 25); // REMOVED LIMIT
 
     // Add fixed special cards
     const fixedTypes = ['skip', 'swap', 'reverse', 'shield', 'reveal'];

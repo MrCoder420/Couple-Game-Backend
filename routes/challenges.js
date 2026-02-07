@@ -77,6 +77,8 @@ router.put('/:id/respond', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Invalid response' });
         }
 
+        console.log(`[API] Respond to challenge ${id}. User: ${req.userId}, Response: ${response}`);
+
         // Update challenge
         const { data: challenge, error } = await supabase
             .from('challenges')
@@ -88,6 +90,10 @@ router.put('/:id/respond', authMiddleware, async (req, res) => {
             .eq('receiver_id', req.userId) // Ensure only receiver can respond
             .select()
             .single();
+
+        if (error) console.error('[API] Update error:', error);
+        if (!challenge) console.error('[API] Challenge not found or user not receiver');
+        else console.log('[API] Challenge updated:', challenge.status);
 
         if (error || !challenge) {
             return res.status(404).json({ error: 'Challenge not found' });

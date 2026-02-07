@@ -2,6 +2,10 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+require('dotenv').config();
+const { Expo } = require('expo-server-sdk');
+
+const expo = new Expo();
 
 const app = express();
 app.use(cors());
@@ -149,7 +153,7 @@ io.on('connection', (socket) => {
     });
 
     // GAMEPLAY: SEND CHALLENGE
-    socket.on('send_challenge', (data) => {
+    socket.on('send_challenge', async (data) => {
         console.log(`[DEBUG] Backend received 'send_challenge' from ${socket.id}`);
         console.log(`[DEBUG] Challenge Data:`, JSON.stringify(data, null, 2));
 
@@ -187,6 +191,34 @@ io.on('connection', (socket) => {
         io.to(receiverId).emit('challenge_received', challenge);
         console.log(`[DEBUG] Emitted 'challenge_received' to SOCKET ${receiverId}`);
         console.log(`[DEBUG] Payload size: ${JSON.stringify(challenge).length} chars`);
+
+        // SEND PUSH NOTIFICATION TO RECEIVER
+        const receiverPushToken = room.pushTokens ? room.pushTokens[receiverId] : null;
+        if (receiverPushToken && Expo.isExpoPushToken(receiverPushToken)) {
+            const messages = [{
+                to: receiverPushToken,
+                sound: 'default',
+                title: 'New Challenge! 💌',
+                body: `${card.content || 'Your partner sent a card!'}`,
+                data: {
+                    type: 'new_challenge',
+                    card: card,
+                    roomId: roomCode
+                },
+            }];
+
+            try {
+                const chunks = expo.chunkPushNotifications(messages);
+                for (let chunk of chunks) {
+                    await expo.sendPushNotificationsAsync(chunk);
+                }
+                console.log(`[PUSH] Sent notification to ${receiverId}`);
+            } catch (error) {
+                console.error(`[PUSH] Error sending notification:`, error);
+            }
+        } else {
+            console.log(`[PUSH] No valid token for receiver ${receiverId} (Token: ${receiverPushToken})`);
+        }
     });
 
     // GAMEPLAY: RESPOND TO CHALLENGE
@@ -245,6 +277,30 @@ io.on('connection', (socket) => {
         }
     });
 
+    // REGISTER PUSH TOKEN
+    socket.on('register_push_token', (data) => {
+        const { token } = data;
+        console.log(`[PUSH] Registering token for ${socket.id}: ${token}`);
+
+        // Find which room this socket is in
+        // In a real app, we'd map userId -> token in DB
+        // Here we map socketId -> token in the room object
+
+        let foundRoom = false;
+        rooms.forEach((room, code) => {
+            if (room.players.includes(socket.id)) {
+                if (!room.pushTokens) room.pushTokens = {};
+                room.pushTokens[socket.id] = token;
+                console.log(`[PUSH] Token saved for room ${code}`);
+                foundRoom = true;
+            }
+        });
+
+        if (!foundRoom) {
+            console.warn(`[PUSH] Could not find room for socket ${socket.id} to save token. Token lost for now.`);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         // Cleanup: Remove user from any rooms
@@ -269,7 +325,7 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`SERVER RUNNING ON PORT ${PORT}`);
 });

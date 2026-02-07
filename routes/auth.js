@@ -51,7 +51,7 @@ router.post('/login', async (req, res) => {
 
         // Generate JWT token
         const token = jwt.sign(
-            { userId: user.id, email: user.email },
+            { id: user.id, email: user.email }, // Changed userId to id
             process.env.JWT_SECRET,
             { expiresIn: '30d' }
         );
@@ -87,7 +87,7 @@ router.get('/me', async (req, res) => {
         const { data: user, error } = await supabase
             .from('users')
             .select('*')
-            .eq('id', decoded.userId)
+            .eq('id', decoded.id) // Changed from decoded.userId
             .single();
 
         if (error || !user) {
